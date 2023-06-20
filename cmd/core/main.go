@@ -1,6 +1,13 @@
 package main
 
-import "github.com/streadway/amqp"
+import (
+	"github.com/mmunareto/clean-arch/internal/infra/grpc/pb"
+	"github.com/mmunareto/clean-arch/internal/infra/grpc/service"
+	"github.com/streadway/amqp"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/reflection"
+	"net"
+)
 
 import (
 	"database/sql"
@@ -36,7 +43,20 @@ func main() {
 	webOrderHandler := NewWebOrderHandler(db, eventDispatcher)
 	webserver.AddHandler("/order", webOrderHandler.Create)
 	fmt.Println("Starting web server on port", configs.WebServerPort)
-	webserver.Start()
+	go webserver.Start()
+
+	grpcServer := grpc.NewServer()
+	createOrderUseCase := NewCreateOrderUseCase(db, eventDispatcher)
+	createOrderService := service.NewOrderService(*createOrderUseCase)
+	pb.RegisterOrderServiceServer(grpcServer, createOrderService)
+	reflection.Register(grpcServer)
+
+	fmt.Println("Starting gRPC server on port", configs.GRPCServerPort)
+	lis, err := net.Listen("tcp", fmt.Sprintf(":%s", configs.GRPCServerPort))
+	if err != nil {
+		panic(err)
+	}
+	grpcServer.Serve(lis)
 }
 
 func getRabbitMQChannel() *amqp.Channel {
