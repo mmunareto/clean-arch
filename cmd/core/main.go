@@ -1,22 +1,24 @@
 package main
 
 import (
+	"database/sql"
+	"fmt"
+	"github.com/99designs/gqlgen/graphql/playground"
+	"github.com/mmunareto/clean-arch/configs"
+	"github.com/mmunareto/clean-arch/internal/infra/event/handler"
+	"github.com/mmunareto/clean-arch/internal/infra/graph"
 	"github.com/mmunareto/clean-arch/internal/infra/grpc/pb"
 	"github.com/mmunareto/clean-arch/internal/infra/grpc/service"
+	"github.com/mmunareto/clean-arch/internal/infra/web/webserver"
+	"github.com/mmunareto/clean-arch/pkg/events"
 	"github.com/streadway/amqp"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 	"net"
-)
+	"net/http"
 
-import (
-	"database/sql"
-	"fmt"
-	"github.com/mmunareto/clean-arch/configs"
-	"github.com/mmunareto/clean-arch/internal/infra/event/handler"
-	"github.com/mmunareto/clean-arch/internal/infra/web/webserver"
-	"github.com/mmunareto/clean-arch/pkg/events"
 	// mysql
+	graphql_handler "github.com/99designs/gqlgen/graphql/handler"
 	_ "github.com/go-sql-driver/mysql"
 )
 
@@ -56,7 +58,16 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	grpcServer.Serve(lis)
+	go grpcServer.Serve(lis)
+
+	srv := graphql_handler.NewDefaultServer(graph.NewExecutableSchema(graph.Config{Resolvers: &graph.Resolver{
+		CreateOrderUseCase: *createOrderUseCase,
+	}}))
+	http.Handle("/", playground.Handler("GraphQL playground", "/query"))
+	http.Handle("/query", srv)
+
+	fmt.Println("Starting GraphQL server on port", configs.GraphQLServerPort)
+	http.ListenAndServe(":"+configs.GraphQLServerPort, nil)
 }
 
 func getRabbitMQChannel() *amqp.Channel {
