@@ -50,7 +50,8 @@ func main() {
 
 	grpcServer := grpc.NewServer()
 	createOrderUseCase := NewCreateOrderUseCase(db, eventDispatcher)
-	createOrderService := service.NewOrderService(*createOrderUseCase)
+	listOrdersUseCase := NewListOrdersUseCase(db)
+	createOrderService := service.NewOrderService(*createOrderUseCase, *listOrdersUseCase)
 	pb.RegisterOrderServiceServer(grpcServer, createOrderService)
 	reflection.Register(grpcServer)
 
